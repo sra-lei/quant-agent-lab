@@ -9,7 +9,7 @@ is what the analysts call once LLM-backed reasoning is enabled (v0.2).
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.config import settings
@@ -19,24 +19,83 @@ log = get_logger(__name__)
 
 
 @dataclass
+class ToolCall:
+    """模型请求执行的一次工具调用。"""
+
+    id: str
+    name: str
+    arguments: dict
+
+
+@dataclass
 class LLMResult:
     text: str
     tokens: int = 0
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
 
 class LLMClient(Protocol):
     model: str
 
-    def complete(self, system: str, user: str) -> LLMResult: ...
+    def complete(
+        self,
+        system: str,
+        user: str,
+        tools: list[dict] | None = None,
+    ) -> LLMResult: ...
+
+
+def _sample_args(schema: dict) -> dict:
+    """按参数 schema 造一组最小合法参数（仅 mock 用）。"""
+    props = (schema or {}).get("properties") or {}
+    required = (schema or {}).get("required") or list(props.keys())
+    out: dict = {}
+    for key in required:
+        spec = props.get(key) or {}
+        kind = spec.get("type")
+        if kind == "string":
+            enum = spec.get("enum")
+            out[key] = enum[0] if enum else spec.get("default", "600519")
+        elif kind == "integer":
+            out[key] = int(spec.get("default", 20))
+        elif kind == "number":
+            out[key] = float(spec.get("default", 15.0))
+        elif kind == "boolean":
+            out[key] = True
+        else:
+            out[key] = None
+    return out
 
 
 class MockLLM:
-    """Deterministic stub so the pipeline runs with zero API keys."""
+    """Deterministic stub so the pipeline runs with zero API keys.
+
+    有工具可用时，第一轮返回一次工具调用（先跑通"执行"这条路），
+    收到工具结果后再给出最终文本。
+    """
 
     def __init__(self, model: str = "mock") -> None:
         self.model = model
 
-    def complete(self, system: str, user: str) -> LLMResult:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        tools: list[dict] | None = None,
+    ) -> LLMResult:
+        if tools and "## 工具执行结果" not in user:
+            fn = tools[0]["function"]
+            return LLMResult(
+                text="",
+                tokens=0,
+                tool_calls=[
+                    ToolCall(
+                        id="mock-call-1",
+                        name=fn["name"],
+                        arguments=_sample_args(fn.get("parameters") or {}),
+                    )
+                ],
+            )
         return LLMResult(text=f"[mock:{self.model}] {user[:120]}", tokens=0)
 
 
@@ -49,27 +108,49 @@ class OpenAICompatLLM:
         self.api_key = api_key
         self.timeout = timeout
 
-    def complete(self, system: str, user: str) -> LLMResult:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        tools: list[dict] | None = None,
+    ) -> LLMResult:
         import httpx
+
+        payload: dict = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": 0.2,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
 
         resp = httpx.post(
             f"{self.base_url}/chat/completions",
             headers={"Authorization": f"Bearer {self.api_key}"},
-            json={
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                "temperature": 0.2,
-            },
+            json=payload,
             timeout=self.timeout,
         )
         resp.raise_for_status()
         data = resp.json()
-        text = data["choices"][0]["message"]["content"]
+        message = data["choices"][0]["message"]
         tokens = int((data.get("usage") or {}).get("total_tokens", 0))
-        return LLMResult(text=text, tokens=tokens)
+
+        tool_calls: list[ToolCall] = []
+        for call in message.get("tool_calls") or []:
+            fn = call.get("function") or {}
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            tool_calls.append(
+                ToolCall(id=str(call.get("id") or ""), name=str(fn.get("name") or ""), arguments=args)
+            )
+
+        return LLMResult(text=message.get("content") or "", tokens=tokens, tool_calls=tool_calls)
 
 
 def get_llm(tier: str = "cheap") -> LLMClient:

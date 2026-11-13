@@ -8,12 +8,19 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from typing import Any
 
+from app.agents.tool_handlers import ToolContext, execute_tool
+from app.agents.tools import key_from_function_name, openai_tools
 from app.core.llm import estimate_tokens, get_llm
 from app.core.logging import get_logger
+from app.data.registry import get_provider
 
 log = get_logger(__name__)
+
+#: 单次运行最多几轮"模型 → 工具 → 模型"
+MAX_TOOL_ROUNDS = 4
 
 
 class ConfigAgentError(RuntimeError):
@@ -55,49 +62,85 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
 """
 
 
-def run_config_agent(config: dict[str, Any], input_payload: dict[str, Any]) -> dict[str, Any]:
+def run_config_agent(
+    config: dict[str, Any],
+    input_payload: dict[str, Any],
+    ctx: ToolContext | None = None,
+) -> dict[str, Any]:
+    """执行一次配置驱动的 Agent：模型可多轮调用工具，最后产出结论。"""
     prompt = build_prompt(config, input_payload)
-    llm = get_llm(tier="strong" if config.get("tools") else "cheap")
+    tool_keys = list(config.get("tools") or [])
+    tools = openai_tools(tool_keys)
 
-    output_format = config.get("output_format") or {}
+    llm = get_llm(tier="strong" if tool_keys else "cheap")
     is_mock = type(llm).__name__ == "MockLLM"
 
-    if is_mock and output_format.get("type") == "json_schema":
-        # 没有 API Key 时不能假装模型生成了内容：按 schema 造一个结构样例，
-        # 让编辑器可以完整走通，同时用 mock 标记明确告知这不是真实推理。
-        sample = _sample_from_schema(output_format.get("schema") or {})
-        return {
-            "agent_id": config.get("agent_id"),
-            "output": sample,
-            "raw": json.dumps(sample, ensure_ascii=False, indent=2),
-            "format_ok": True,
-            "error": None,
-            "tokens": 0,
-            "mock": True,
-            "prompt_preview": prompt[:800],
-        }
+    tool_ctx = ctx or ToolContext(provider=get_provider(), as_of=date.today())
 
-    result = llm.complete(system="你是一个严格遵循工作流与输出格式的投研 Agent。", user=prompt)
+    transcript = prompt
+    text = ""
+    tokens = 0
+    tool_trace: list[dict[str, Any]] = []
+    rounds = 0
 
+    for rounds in range(1, MAX_TOOL_ROUNDS + 1):
+        result = llm.complete(
+            system="你是一个严格遵循工作流与输出格式的投研 Agent。需要数据时调用工具，不要凭记忆编造数字。",
+            user=transcript,
+            tools=tools or None,
+        )
+        tokens += result.tokens
+
+        if not result.tool_calls:
+            text = result.text
+            break
+
+        batch: list[dict[str, Any]] = []
+        for call in result.tool_calls:
+            key = key_from_function_name(call.name)
+            if key not in tool_keys:
+                batch.append({"tool": key, "error": "该工具不在本 Agent 的可用列表中，已拒绝执行"})
+                continue
+            output = execute_tool(tool_ctx, key, call.arguments)
+            batch.append({"tool": key, "args": call.arguments, "result": output})
+
+        tool_trace.extend(batch)
+        transcript += "\n\n## 工具执行结果\n" + json.dumps(batch, ensure_ascii=False, indent=2)[:6000]
+        transcript += "\n\n请基于以上工具结果给出最终答案。"
+
+    output_format = config.get("output_format") or {}
     parsed: Any = None
     error: str | None = None
 
     if output_format.get("type") == "json_schema":
         try:
-            parsed = _extract_json(result.text)
+            parsed = _extract_json(text) if text else None
+            if parsed is None:
+                raise ConfigAgentError("模型未返回 JSON")
             _validate(parsed, output_format.get("schema") or {})
         except Exception as exc:  # noqa: BLE001
-            error = f"输出未通过 schema 校验：{exc}"
-            parsed = None
+            if is_mock:
+                # 演示模式：模型不会真的产出合规 JSON，按 schema 造样例，
+                # 但保留 mock 标记，前端会明确提示这不是真实推理。
+                parsed = _sample_from_schema(output_format.get("schema") or {})
+                error = None
+            else:
+                error = f"输出未通过 schema 校验：{exc}"
+                parsed = None
+
+    if not text and not tool_trace:
+        error = error or "模型没有返回内容"
 
     return {
         "agent_id": config.get("agent_id"),
-        "output": parsed if parsed is not None else result.text,
-        "raw": result.text,
+        "output": parsed if parsed is not None else (text or tool_trace),
+        "raw": text,
         "format_ok": error is None,
         "error": error,
-        "tokens": result.tokens or estimate_tokens(prompt),
+        "tokens": tokens or estimate_tokens(transcript),
         "mock": is_mock,
+        "tool_calls": tool_trace,
+        "rounds": rounds,
         "prompt_preview": prompt[:800],
     }
 

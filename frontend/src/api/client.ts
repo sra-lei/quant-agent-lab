@@ -127,6 +127,13 @@ export interface AgentMeta {
   default_schema: Record<string, unknown>
 }
 
+export interface AgentToolCallRecord {
+  tool: string
+  args?: Record<string, unknown>
+  result?: unknown
+  error?: string
+}
+
 export interface AgentRunResult {
   agent_id: string
   output: unknown
@@ -135,6 +142,8 @@ export interface AgentRunResult {
   error: string | null
   tokens: number
   mock: boolean
+  tool_calls: AgentToolCallRecord[]
+  rounds: number
   prompt_preview: string
 }
 

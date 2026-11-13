@@ -496,8 +496,36 @@ export default function Agents() {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 8 }}
-                message="演示模式：未配置 LLM API Key，输出是按 schema 生成的样例，不是真实推理结果"
+                message="演示模式：未配置 LLM API Key，工具调用是真实执行的，但最终结论为样例输出"
               />
+            )}
+            {runResult.tool_calls?.length > 0 && (
+              <>
+                <Text strong>
+                  工具调用：{runResult.tool_calls.length} 次 / {runResult.rounds} 轮
+                </Text>
+                <Table
+                  style={{ marginBottom: 12 }}
+                  rowKey={(r: { tool: string }, i) => `${r.tool}-${i ?? 0}`}
+                  pagination={false}
+                  size="small"
+                  dataSource={runResult.tool_calls}
+                  columns={[
+                    { title: '工具', dataIndex: 'tool', width: 160 },
+                    {
+                      title: '参数',
+                      dataIndex: 'args',
+                      width: 220,
+                      render: (v: unknown) => <DiffValue value={v} />,
+                    },
+                    {
+                      title: '执行结果',
+                      dataIndex: 'result',
+                      render: (v: unknown) => <DiffValue value={v} />,
+                    },
+                  ]}
+                />
+              </>
             )}
             {runResult.format_ok ? (
               <Alert type="success" showIcon message="输出通过格式校验" style={{ marginBottom: 8 }} />

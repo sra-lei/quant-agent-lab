@@ -12,6 +12,7 @@ venv/
 *.sqlite
 *.sqlite3
 data/
+reports/
 
 # Env & secrets
 .env
