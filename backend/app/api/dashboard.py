@@ -100,9 +100,10 @@ def _capital_flow() -> dict[str, Any]:
 
 def _sentiment() -> dict[str, Any]:
     return {
-        "status": "ok",
-        "source": "mock（zvt 可算，P1 接入）",
+        "status": "degraded",
+        "source": "mock（zvt 已具备计算条件，P1 接入）",
         "as_of": AS_OF,
+        "note": "曲线与极端标的为示例数据，尚未接本地库",
         "data": {
             "series": _sentiment_series(60),
             "ma20": 55.4,
@@ -137,9 +138,10 @@ def _opportunity() -> dict[str, Any]:
 
 def _risks() -> dict[str, Any]:
     return {
-        "status": "ok",
+        "status": "degraded",
         "source": "mock（规则引擎待写）",
         "as_of": f"{AS_OF} 15:35",
+        "note": "预警条目为示例，规则引擎尚未实现",
         "data": {
             "items": [
                 {
