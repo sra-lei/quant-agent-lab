@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.agents.config_agent import run_config_agent
 from app.agents.tools import DEFAULT_OUTPUT_SCHEMA, OUTPUT_FORMATS, all_tools, validate_tools
 from app.agents import versions as versioning
+from app.api.reports import save_report
 from app.db.models import AgentConfigRow
 from app.db.session import session_scope
 
@@ -192,9 +193,28 @@ def run_agent(agent_id: str, body: RunAgentIn) -> dict[str, Any]:
         config = _row_to_dict(row)
 
     try:
-        return run_config_agent(config, body.input)
+        result = run_config_agent(config, body.input)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"试运行失败：{exc}") from exc
+
+    # 有产出就留档，前端「报告」页可以直接在线查看
+    if result.get("output") and not result.get("error"):
+        with session_scope() as db:
+            report = save_report(
+                db,
+                agent_id=agent_id,
+                agent_name=config.get("name") or agent_id,
+                output=result.get("output"),
+                input_payload=body.input,
+                tool_calls=result.get("tool_calls") or [],
+                tokens=int(result.get("tokens") or 0),
+                rounds=int(result.get("rounds") or 0),
+                mock=bool(result.get("mock")),
+            )
+            if report is not None:
+                result["report_id"] = report.report_id
+
+    return result
 
 
 # -------------------------------------------------------------------- versions

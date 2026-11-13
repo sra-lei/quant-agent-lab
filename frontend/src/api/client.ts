@@ -147,6 +147,26 @@ export interface AgentRunResult {
   tool_calls: AgentToolCallRecord[]
   rounds: number
   prompt_preview: string
+  report_id?: string
+}
+
+export interface AgentReportSummary {
+  report_id: string
+  agent_id: string
+  agent_name: string
+  title: string
+  format: 'text' | 'json'
+  tokens: number
+  rounds: number
+  mock: boolean
+  tool_calls: AgentToolCallRecord[]
+  input: Record<string, unknown>
+  created_at: string | null
+  length: number
+}
+
+export interface AgentReport extends AgentReportSummary {
+  content: string
 }
 
 export type AgentConfigPayload = Omit<AgentConfig, 'agent_id' | 'builtin' | 'updated_at'>
@@ -202,4 +222,9 @@ export const api = {
       `/agents/${id}/versions/${version}/restore`,
       {},
     ),
+
+  reports: (agentId?: string) =>
+    get<AgentReportSummary[]>(`/reports${agentId ? `?agent_id=${agentId}` : ''}`),
+  report: (id: string) => get<AgentReport>(`/reports/${id}`),
+  deleteReport: (id: string) => del<{ deleted: string }>(`/reports/${id}`),
 }

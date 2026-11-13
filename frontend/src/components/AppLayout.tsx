@@ -3,6 +3,7 @@ import {
   DashboardOutlined,
   ExperimentOutlined,
   FileSearchOutlined,
+  FileTextOutlined,
   FundOutlined,
   ProfileOutlined,
   RobotOutlined,
@@ -16,6 +17,7 @@ const items = [
   { key: '/signals', icon: <FundOutlined />, label: <Link to="/signals">信号</Link> },
   { key: '/strategies', icon: <ExperimentOutlined />, label: <Link to="/strategies">策略</Link> },
   { key: '/agents', icon: <RobotOutlined />, label: <Link to="/agents">智能体</Link> },
+  { key: '/reports', icon: <FileTextOutlined />, label: <Link to="/reports">报告</Link> },
   { key: '/runs', icon: <ProfileOutlined />, label: <Link to="/runs">运行记录</Link> },
   { key: '/reviews', icon: <FileSearchOutlined />, label: <Link to="/reviews">复盘</Link> },
 ]

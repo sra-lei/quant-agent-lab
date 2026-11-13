@@ -136,6 +136,26 @@ class AgentConfigRow(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
+class AgentReport(Base):
+    """智能体一次性生成的报告（试运行/手动调用都留档，便于在线回看）。"""
+
+    __tablename__ = "agent_reports"
+
+    report_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(64), index=True)
+    agent_name: Mapped[str] = mapped_column(String(120), default="")
+    title: Mapped[str] = mapped_column(String(200), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    #: text | json —— 决定前端用什么方式渲染
+    format: Mapped[str] = mapped_column(String(16), default="text")
+    input_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    tool_calls: Mapped[list] = mapped_column(JSON, default=list)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
+    rounds: Mapped[int] = mapped_column(Integer, default=0)
+    mock: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class AgentConfigVersion(Base):
     """配置版本快照。
 

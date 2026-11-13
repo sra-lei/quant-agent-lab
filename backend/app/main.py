@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.agents.versions import ensure_versions
 from app.api.agent_configs import router as agent_configs_router
+from app.api.reports import router as reports_router
 from app.api.routes import router
 from app.config import settings
 from app.core.logging import get_logger
@@ -57,6 +58,7 @@ app.add_middleware(
 
 app.include_router(router)
 app.include_router(agent_configs_router)
+app.include_router(reports_router)
 
 
 # --------------------------------------------------------------------- serving

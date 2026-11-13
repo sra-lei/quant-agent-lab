@@ -19,7 +19,8 @@ import {
   Typography,
   message,
 } from 'antd'
-import { DeleteOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { DeleteOutlined, FileTextOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { Link } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
 import {
   api,
@@ -616,6 +617,17 @@ export default function Agents() {
                 : JSON.stringify(runResult.output, null, 2)}
             </pre>
             <Text type="secondary">tokens ≈ {runResult.tokens}</Text>
+            <div style={{ marginTop: 10 }}>
+              {runResult.report_id ? (
+                <Link to={`/reports?report=${runResult.report_id}`} target="_blank">
+                  <Button size="small" type="primary" icon={<FileTextOutlined />}>
+                    在线查看报告
+                  </Button>
+                </Link>
+              ) : (
+                <Text type="secondary">本次没有产出，未生成报告</Text>
+              )}
+            </div>
           </>
         )}
       </Drawer>
