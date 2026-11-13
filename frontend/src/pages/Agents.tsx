@@ -8,6 +8,7 @@ import {
   Drawer,
   Form,
   Input,
+  Modal,
   Popconfirm,
   Select,
   Space,
@@ -18,13 +19,15 @@ import {
   Typography,
   message,
 } from 'antd'
-import { DeleteOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { DeleteOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import {
   api,
   type AgentConfig,
   type AgentConfigPayload,
   type AgentRunResult,
+  type AgentVersion,
+  type AgentVersionDiff,
   type OutputFormatType,
 } from '../api/client'
 
@@ -101,6 +104,44 @@ export default function Agents() {
     onSuccess: (res) => setRunResult(res),
     onError: (err: Error) => message.error(err.message),
   })
+
+  // ------------------------------------------------------------- 版本历史
+  const [historyAgent, setHistoryAgent] = useState<AgentConfig | null>(null)
+  const [diff, setDiff] = useState<AgentVersionDiff | null>(null)
+  const [diffLoading, setDiffLoading] = useState(false)
+
+  const versionsQuery = useQuery({
+    queryKey: ['agent-versions', historyAgent?.agent_id],
+    queryFn: () => api.agentVersions(historyAgent!.agent_id),
+    enabled: !!historyAgent,
+  })
+
+  const restore = useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) =>
+      api.restoreAgentVersion(id, version),
+    onSuccess: (row, vars) => {
+      message.success(`已回滚至 v${vars.version}（生成 v${row.new_version ?? '?'}）`)
+      qc.invalidateQueries({ queryKey: ['agents'] })
+      qc.invalidateQueries({ queryKey: ['agent-versions', row.agent_id] })
+      if (editing?.agent_id === row.agent_id) {
+        setEditing(row)
+        openEditor(row)
+      }
+    },
+    onError: (err: Error) => message.error(err.message),
+  })
+
+  const showDiff = async (version: number) => {
+    if (!historyAgent) return
+    setDiffLoading(true)
+    try {
+      setDiff(await api.agentVersionDiff(historyAgent.agent_id, version))
+    } catch (err) {
+      message.error((err as Error).message)
+    } finally {
+      setDiffLoading(false)
+    }
+  }
 
   const openEditor = (row?: AgentConfig) => {
     setEditing(row ?? null)
@@ -182,6 +223,9 @@ export default function Agents() {
       width: 220,
       render: (_, row) => (
         <Space>
+          <Button size="small" type="link" icon={<HistoryOutlined />} onClick={() => setHistoryAgent(row)}>
+            版本
+          </Button>
           <Button size="small" type="link" onClick={() => openEditor(row)}>
             编辑
           </Button>
@@ -233,6 +277,96 @@ export default function Agents() {
         dataSource={agents ?? []}
         pagination={false}
       />
+
+      <Drawer
+        title={historyAgent ? `版本历史：${historyAgent.name}` : '版本历史'}
+        width={760}
+        open={!!historyAgent}
+        onClose={() => setHistoryAgent(null)}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="每次有效修改生成一个版本；内容未变不会新建。回滚会生成新版本，历史不会丢。"
+        />
+        <Table<AgentVersion>
+          rowKey="version"
+          loading={versionsQuery.isLoading}
+          pagination={false}
+          dataSource={versionsQuery.data ?? []}
+          columns={[
+            {
+              title: '版本',
+              dataIndex: 'version',
+              width: 80,
+              render: (v: number) => <Tag color="blue">v{v}</Tag>,
+            },
+            { title: '说明', dataIndex: 'note' },
+            {
+              title: '时间',
+              dataIndex: 'created_at',
+              width: 180,
+              render: (v: string | null) => v?.replace('T', ' ').slice(0, 19) ?? '-',
+            },
+            {
+              title: '操作',
+              width: 170,
+              render: (_, v) => (
+                <Space>
+                  <Button size="small" type="link" loading={diffLoading} onClick={() => showDiff(v.version)}>
+                    对比当前
+                  </Button>
+                  <Popconfirm
+                    title={`回滚到 v${v.version}？`}
+                    description="会用该版本内容生成一个新版本"
+                    onConfirm={() =>
+                      historyAgent &&
+                      restore.mutate({ id: historyAgent.agent_id, version: v.version })
+                    }
+                  >
+                    <Button size="small" type="link" danger>
+                      回滚
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Drawer>
+
+      <Modal
+        title={diff ? `差异：${diff.before_label} → ${diff.after_label}` : '差异'}
+        open={!!diff}
+        onCancel={() => setDiff(null)}
+        footer={null}
+        width={860}
+      >
+        {diff && diff.changes.length === 0 ? (
+          <Alert type="success" showIcon message="两个版本内容一致，没有差异" />
+        ) : (
+          <Table
+            rowKey={(r: { field: string }) => r.field}
+            pagination={false}
+            size="small"
+            dataSource={diff?.changes ?? []}
+            columns={[
+              { title: '字段', dataIndex: 'label', width: 110 },
+              {
+                title: '变更前',
+                dataIndex: 'before',
+                render: (v: unknown) => <DiffValue value={v} />,
+              },
+              {
+                title: '变更后',
+                dataIndex: 'after',
+                render: (v: unknown) => <DiffValue value={v} />,
+              },
+            ]}
+          />
+        )}
+      </Modal>
 
       <Drawer
         title={editing ? `编辑：${editing.name}` : '新建智能体'}
@@ -396,5 +530,27 @@ export default function Agents() {
         )}
       </Drawer>
     </Card>
+  )
+}
+
+function DiffValue({ value }: { value: unknown }) {
+  if (value === null || value === undefined) return <Text type="secondary">—</Text>
+  if (typeof value === 'string') {
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{value}</span>
+  }
+  return (
+    <pre
+      style={{
+        margin: 0,
+        fontSize: 12,
+        maxHeight: 160,
+        overflow: 'auto',
+        background: '#fafafa',
+        padding: 8,
+        borderRadius: 4,
+      }}
+    >
+      {JSON.stringify(value, null, 2)}
+    </pre>
   )
 }

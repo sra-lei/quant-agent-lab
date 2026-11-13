@@ -140,6 +140,26 @@ export interface AgentRunResult {
 
 export type AgentConfigPayload = Omit<AgentConfig, 'agent_id' | 'builtin' | 'updated_at'>
 
+export interface AgentVersion {
+  version: number
+  note: string
+  created_at: string | null
+  payload: {
+    name: string
+    role: string
+    workflow: WorkflowStep[]
+    tools: string[]
+    output_format: AgentOutputFormat
+    enabled: boolean
+  }
+}
+
+export interface AgentVersionDiff {
+  before_label: string
+  after_label: string
+  changes: Array<{ field: string; label: string; before: unknown; after: unknown }>
+}
+
 export const api = {
   health: () => get<Health>('/health'),
   signals: () => get<Signal[]>('/signals'),
@@ -158,4 +178,15 @@ export const api = {
   deleteAgent: (id: string) => del<{ deleted: string }>(`/agents/${id}`),
   runAgent: (id: string, input: Record<string, unknown>) =>
     post<AgentRunResult>(`/agents/${id}/run`, { input }),
+
+  agentVersions: (id: string) => get<AgentVersion[]>(`/agents/${id}/versions`),
+  agentVersionDiff: (id: string, version: number, against?: number) =>
+    get<AgentVersionDiff>(
+      `/agents/${id}/versions/${version}/diff${against ? `?against=${against}` : ''}`,
+    ),
+  restoreAgentVersion: (id: string, version: number) =>
+    post<AgentConfig & { restored_from: number; new_version: number | null }>(
+      `/agents/${id}/versions/${version}/restore`,
+      {},
+    ),
 }

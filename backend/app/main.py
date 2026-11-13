@@ -11,6 +11,7 @@ from app.api.agent_configs import router as agent_configs_router
 from app.api.routes import router
 from app.config import settings
 from app.core.logging import get_logger
+from app.agents.versions import ensure_versions
 from app.db.seed import seed_builtin_agents
 from app.db.session import init_db, session_scope
 
@@ -22,6 +23,7 @@ async def lifespan(_: FastAPI):
     init_db()
     with session_scope() as db:
         seed_builtin_agents(db)
+        ensure_versions(db)
     log.info(
         "quant-agent-lab started orchestrator=%s provider=%s",
         settings.orchestrator,

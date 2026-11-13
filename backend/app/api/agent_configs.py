@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.agents.config_agent import run_config_agent
 from app.agents.tools import DEFAULT_OUTPUT_SCHEMA, OUTPUT_FORMATS, all_tools, validate_tools
+from app.agents import versions as versioning
 from app.db.models import AgentConfigRow
 from app.db.session import session_scope
 
@@ -125,6 +126,7 @@ def create_agent(body: AgentConfigIn) -> dict[str, Any]:
         )
         db.add(row)
         db.flush()
+        versioning.record_version(db, row, note="创建", force=True)
         return _row_to_dict(row)
 
 
@@ -143,6 +145,7 @@ def update_agent(agent_id: str, body: AgentConfigIn) -> dict[str, Any]:
         row.enabled = body.enabled
         row.updated_at = datetime.now()
         db.flush()
+        versioning.record_version(db, row, note="编辑")
         return _row_to_dict(row)
 
 
@@ -171,3 +174,75 @@ def run_agent(agent_id: str, body: RunAgentIn) -> dict[str, Any]:
         return run_config_agent(config, body.input)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"试运行失败：{exc}") from exc
+
+
+# -------------------------------------------------------------------- versions
+@router.get("/{agent_id}/versions")
+def list_versions(agent_id: str) -> list[dict[str, Any]]:
+    with session_scope() as db:
+        if db.get(AgentConfigRow, agent_id) is None:
+            raise HTTPException(status_code=404, detail="agent not found")
+        return versioning.list_versions(db, agent_id)
+
+
+@router.get("/{agent_id}/versions/{version}")
+def get_version(agent_id: str, version: int) -> dict[str, Any]:
+    with session_scope() as db:
+        row = versioning.get_version(db, agent_id, version)
+        if row is None:
+            raise HTTPException(status_code=404, detail="version not found")
+        return {
+            "version": row.version,
+            "note": row.note,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "payload": row.payload,
+        }
+
+
+@router.get("/{agent_id}/versions/{version}/diff")
+def diff_version(agent_id: str, version: int, against: int | None = None) -> dict[str, Any]:
+    """默认与该版本的"当前配置"对比；传 against=N 则与另一个版本对比。"""
+    with session_scope() as db:
+        target = versioning.get_version(db, agent_id, version)
+        if target is None:
+            raise HTTPException(status_code=404, detail="version not found")
+
+        if against is None:
+            row = db.get(AgentConfigRow, agent_id)
+            if row is None:
+                raise HTTPException(status_code=404, detail="agent not found")
+            after = versioning.snapshot(row)
+            after_label = "当前配置"
+        else:
+            other = versioning.get_version(db, agent_id, against)
+            if other is None:
+                raise HTTPException(status_code=404, detail=f"version {against} not found")
+            after = other.payload
+            after_label = f"v{against}"
+
+        return {
+            "before_label": f"v{version}",
+            "after_label": after_label,
+            "changes": versioning.diff_payload(target.payload, after),
+        }
+
+
+@router.post("/{agent_id}/versions/{version}/restore")
+def restore_version(agent_id: str, version: int) -> dict[str, Any]:
+    with session_scope() as db:
+        row = db.get(AgentConfigRow, agent_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="agent not found")
+        target = versioning.get_version(db, agent_id, version)
+        if target is None:
+            raise HTTPException(status_code=404, detail="version not found")
+
+        versioning.restore_version(db, row, target)
+        row.updated_at = datetime.now()
+        db.flush()
+        new_version = versioning.record_version(db, row, note=f"回滚至 v{version}", force=True)
+
+        result = _row_to_dict(row)
+        result["restored_from"] = version
+        result["new_version"] = new_version.version if new_version else None
+        return result
