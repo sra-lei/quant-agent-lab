@@ -36,10 +36,12 @@ class OutputFormat(BaseModel):
 
 class AgentConfigIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    role: str = ""
+    role: str = Field(default="", max_length=2000)
+    profile: str = Field(default="", max_length=4000)
     workflow: list[WorkflowStep] = Field(default_factory=list)
     tools: list[str] = Field(default_factory=list)
     output_format: OutputFormat = Field(default_factory=OutputFormat)
+    output_spec: str = Field(default="", max_length=8000)
     enabled: bool = True
 
     @field_validator("tools")
@@ -68,9 +70,11 @@ def _row_to_dict(row: AgentConfigRow) -> dict[str, Any]:
         "agent_id": row.agent_id,
         "name": row.name,
         "role": row.role,
+        "profile": row.profile or "",
         "workflow": row.workflow or [],
         "tools": row.tools or [],
         "output_format": row.output_format or {"type": "text"},
+        "output_spec": row.output_spec or "",
         "enabled": row.enabled,
         "builtin": row.builtin,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
@@ -118,9 +122,11 @@ def create_agent(body: AgentConfigIn) -> dict[str, Any]:
             agent_id=_new_agent_id(body.name),
             name=body.name,
             role=body.role,
+            profile=body.profile,
             workflow=[s.model_dump() for s in body.workflow],
             tools=body.tools,
             output_format=body.output_format.model_dump(by_alias=True),
+            output_spec=body.output_spec,
             enabled=body.enabled,
             builtin=False,
         )
@@ -139,9 +145,11 @@ def update_agent(agent_id: str, body: AgentConfigIn) -> dict[str, Any]:
 
         row.name = body.name
         row.role = body.role
+        row.profile = body.profile
         row.workflow = [s.model_dump() for s in body.workflow]
         row.tools = body.tools
         row.output_format = body.output_format.model_dump(by_alias=True)
+        row.output_spec = body.output_spec
         row.enabled = body.enabled
         row.updated_at = datetime.now()
         db.flush()

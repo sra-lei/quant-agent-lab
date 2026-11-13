@@ -22,10 +22,12 @@ log = get_logger(__name__)
 #: 字段 → 中文名，用于前端 diff 展示
 FIELD_LABELS = {
     "name": "名称",
-    "role": "角色描述",
+    "role": "角色定位",
+    "profile": "角色画像",
     "workflow": "工作流",
     "tools": "可用工具",
     "output_format": "输出格式",
+    "output_spec": "输出规范",
     "enabled": "启用",
 }
 
@@ -34,9 +36,11 @@ def snapshot(row: AgentConfigRow) -> dict[str, Any]:
     return {
         "name": row.name,
         "role": row.role or "",
+        "profile": row.profile or "",
         "workflow": row.workflow or [],
         "tools": row.tools or [],
         "output_format": row.output_format or {"type": "text"},
+        "output_spec": row.output_spec or "",
         "enabled": row.enabled,
     }
 
@@ -129,9 +133,11 @@ def restore_version(db: Session, row: AgentConfigRow, version: AgentConfigVersio
     payload = version.payload or {}
     row.name = payload.get("name", row.name)
     row.role = payload.get("role", "")
+    row.profile = payload.get("profile", "")
     row.workflow = payload.get("workflow", [])
     row.tools = payload.get("tools", [])
     row.output_format = payload.get("output_format", {"type": "text"})
+    row.output_spec = payload.get("output_spec", "")
     row.enabled = bool(payload.get("enabled", True))
     db.flush()
     return row

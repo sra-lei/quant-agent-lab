@@ -113,9 +113,11 @@ export interface AgentConfig {
   agent_id: string
   name: string
   role: string
+  profile: string
   workflow: WorkflowStep[]
   tools: string[]
   output_format: AgentOutputFormat
+  output_spec: string
   enabled: boolean
   builtin: boolean
   updated_at: string | null
@@ -156,9 +158,11 @@ export interface AgentVersion {
   payload: {
     name: string
     role: string
+    profile: string
     workflow: WorkflowStep[]
     tools: string[]
     output_format: AgentOutputFormat
+    output_spec: string
     enabled: boolean
   }
 }

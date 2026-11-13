@@ -121,10 +121,15 @@ class AgentConfigRow(Base):
 
     agent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
+    #: 一句话定位：你是谁、管什么、不管什么
     role: Mapped[str] = mapped_column(Text, default="")
+    #: 角色画像：性格权重、信念、偏好、忌讳（从 role 里拆出来的）
+    profile: Mapped[str] = mapped_column(Text, default="")
     workflow: Mapped[list] = mapped_column(JSON, default=list)
     tools: Mapped[list] = mapped_column(JSON, default=list)
     output_format: Mapped[dict] = mapped_column(JSON, default=dict)
+    #: 输出规范：报告模板、段落结构、必须出现的要素（自由文本，与 output_format 的类型互补）
+    output_spec: Mapped[str] = mapped_column(Text, default="")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     builtin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

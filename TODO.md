@@ -35,6 +35,8 @@
       · 实测一次价投 Agent：3 轮、3 次工具调用、约 5.3k tokens
 - [x] 接入真实行情（通达信问小达 MCP）：收盘价/成交量/PE/PB/ROE/涨停家数
       · 实测 3 只股票端到端 run，数据源 `tdx_wenda`，stale=false
+- [x] 角色字段拆分：role（定位）/ profile（画像）/ output_spec（输出规范）独立编辑
+      · 含 SQLite 轻量迁移与旧数据一键拆分脚本
 
 ## 已知限制（数据源）
 

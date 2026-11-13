@@ -29,6 +29,8 @@ class ConfigAgentError(RuntimeError):
 
 def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
     role = config.get("role") or "你是一名投研分析师。"
+    profile = (config.get("profile") or "").strip()
+    output_spec = (config.get("output_spec") or "").strip()
     steps = config.get("workflow") or []
     tools = config.get("tools") or []
     fmt = (config.get("output_format") or {}).get("type", "text")
@@ -46,6 +48,11 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
         "text": "输出简洁的中文结论，要点化。",
     }.get(fmt, "输出简洁的中文结论。")
 
+    # 角色画像与输出规范是独立的可编辑块：有内容才拼进去，避免空标题干扰模型
+    profile_block = f"\n## 角色画像\n{profile}\n" if profile else ""
+
+    output_block = f"\n## 输出规范\n{output_spec}\n" if output_spec else ""
+
     schema_block = ""
     if fmt == "json_schema":
         schema = (config.get("output_format") or {}).get("schema") or {}
@@ -60,7 +67,7 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
         )
 
     return f"""{role}
-
+{profile_block}
 ## 你的工作流
 {step_lines}
 
@@ -69,6 +76,7 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
 
 ## 输出要求
 {fmt_hint}
+{output_block}
 {schema_block}
 ## 本次输入
 {json.dumps(input_payload, ensure_ascii=False, indent=2)}

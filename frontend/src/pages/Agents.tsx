@@ -37,9 +37,11 @@ const { Text } = Typography
 interface FormValues {
   name: string
   role: string
+  profile: string
   workflow: Array<{ name: string; instruction: string }>
   tools: string[]
   output_format_type: OutputFormatType
+  output_spec: string
   schema_text: string
   enabled: boolean
 }
@@ -68,12 +70,14 @@ export default function Agents() {
       const payload: AgentConfigPayload = {
         name: values.name,
         role: values.role ?? '',
+        profile: values.profile ?? '',
         workflow: values.workflow ?? [],
         tools: values.tools ?? [],
         output_format:
           values.output_format_type === 'json_schema'
             ? { type: 'json_schema', schema }
             : { type: values.output_format_type },
+        output_spec: values.output_spec ?? '',
         enabled: values.enabled ?? true,
       }
       return editing
@@ -151,9 +155,11 @@ export default function Agents() {
         ? {
             name: row.name,
             role: row.role,
+            profile: row.profile ?? '',
             workflow: row.workflow ?? [],
             tools: row.tools ?? [],
             output_format_type: row.output_format?.type ?? 'text',
+            output_spec: row.output_spec ?? '',
             schema_text: row.output_format?.schema
               ? JSON.stringify(row.output_format.schema, null, 2)
               : JSON.stringify(meta?.default_schema ?? {}, null, 2),
@@ -162,9 +168,11 @@ export default function Agents() {
         : {
             name: '',
             role: '',
+            profile: '',
             workflow: [{ name: '第一步', instruction: '' }],
             tools: [],
             output_format_type: 'markdown_table',
+            output_spec: '',
             schema_text: JSON.stringify(meta?.default_schema ?? {}, null, 2),
             enabled: true,
           },
@@ -186,7 +194,7 @@ export default function Agents() {
       ),
     },
     {
-      title: '角色描述',
+      title: '角色定位',
       dataIndex: 'role',
       ellipsis: true,
       render: (role: string) => role || <Text type="secondary">未填写</Text>,
@@ -401,13 +409,26 @@ export default function Agents() {
 
           <Form.Item
             name="role"
-            label="角色描述"
-            tooltip="这是这个 Agent 的系统人格：它是什么身份、负责什么、边界在哪"
+            label="角色定位"
+            tooltip="一句话说清：它是什么身份、负责什么、边界在哪。不要把画像和输出模板塞进来"
           >
             <TextArea
-              rows={3}
+              rows={2}
               placeholder="你是……，只负责……，不做……"
               maxLength={2000}
+              showCount
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="profile"
+            label="角色画像"
+            tooltip="性格权重、信念、偏好、忌讳。例如「历史规律 0.9（深信历史会重演）」，这些会作为独立段落进入提示词"
+          >
+            <TextArea
+              rows={7}
+              placeholder={'例如：\n- 历史规律：0.9（深信历史会重演，主动对比相似日）\n- 细节洞察力：0.85（关注炸板率、封成比）\n- 风险敏感度：0.95（对核按钮、天地板极度敏感）'}
+              maxLength={4000}
               showCount
             />
           </Form.Item>
@@ -464,6 +485,19 @@ export default function Agents() {
           <Divider orientation="left" plain>
             输出格式
           </Divider>
+          <Form.Item
+            name="output_spec"
+            label="输出规范（报告模板）"
+            tooltip="要什么结构、哪些段落必须有、用什么格式。留空则只按下面的类型提示"
+          >
+            <TextArea
+              rows={8}
+              placeholder={'例如：\n请生成一份《游资情绪复盘报告》：\n1. 核心数据（情绪指数、连板梯队、封板成功率）\n2. 周期定位与历史参考\n3. 明日作战预案（主推/防守 + 观察锚点）'}
+              maxLength={8000}
+              showCount
+            />
+          </Form.Item>
+
           <Form.Item name="output_format_type" label="类型">
             <Select
               options={(meta?.output_formats ?? []).map((f) => ({ value: f.type, label: f.label }))}
