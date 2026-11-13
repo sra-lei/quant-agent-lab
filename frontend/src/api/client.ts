@@ -114,6 +114,7 @@ export interface AgentConfig {
   name: string
   role: string
   profile: string
+  task: string
   workflow: WorkflowStep[]
   tools: string[]
   output_format: AgentOutputFormat
@@ -179,6 +180,7 @@ export interface AgentVersion {
     name: string
     role: string
     profile: string
+    task: string
     workflow: WorkflowStep[]
     tools: string[]
     output_format: AgentOutputFormat

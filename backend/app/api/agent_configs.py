@@ -41,6 +41,7 @@ class AgentConfigIn(BaseModel):
     role: str = Field(default="", max_length=2000)
     #: None = 客户端没传这个字段（老版本前端），此时保留库里原值，不能被默认空串覆盖
     profile: str | None = Field(default=None, max_length=4000)
+    task: str | None = Field(default=None, max_length=4000)
     workflow: list[WorkflowStep] = Field(default_factory=list)
     tools: list[str] = Field(default_factory=list)
     output_format: OutputFormat = Field(default_factory=OutputFormat)
@@ -74,6 +75,7 @@ def _row_to_dict(row: AgentConfigRow) -> dict[str, Any]:
         "name": row.name,
         "role": row.role,
         "profile": row.profile or "",
+        "task": row.task or "",
         "workflow": row.workflow or [],
         "tools": row.tools or [],
         "output_format": row.output_format or {"type": "text"},
@@ -134,6 +136,7 @@ def create_agent(body: AgentConfigIn) -> dict[str, Any]:
             name=body.name,
             role=body.role,
             profile=body.profile or "",
+            task=body.task or "",
             workflow=_steps(body.workflow),
             tools=body.tools,
             output_format=body.output_format.model_dump(by_alias=True),
@@ -159,6 +162,8 @@ def update_agent(agent_id: str, body: AgentConfigIn) -> dict[str, Any]:
         # 未传就沿用旧值：老客户端/局部更新不该把画像和输出规范清空
         if body.profile is not None:
             row.profile = body.profile
+        if body.task is not None:
+            row.task = body.task
         row.workflow = _steps(body.workflow)
         row.tools = body.tools
         row.output_format = body.output_format.model_dump(by_alias=True)

@@ -22,6 +22,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 _ADDED_COLUMNS = {
     "agent_configs": {
         "profile": "TEXT DEFAULT ''",
+        "task": "TEXT DEFAULT ''",
         "output_spec": "TEXT DEFAULT ''",
     },
 }

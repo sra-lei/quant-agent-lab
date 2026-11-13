@@ -30,6 +30,7 @@ class ConfigAgentError(RuntimeError):
 def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
     role = config.get("role") or "你是一名投研分析师。"
     profile = (config.get("profile") or "").strip()
+    task = (config.get("task") or "").strip()
     output_spec = (config.get("output_spec") or "").strip()
     steps = config.get("workflow") or []
     tools = config.get("tools") or []
@@ -51,6 +52,8 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
     # 角色画像与输出规范是独立的可编辑块：有内容才拼进去，避免空标题干扰模型
     profile_block = f"\n## 角色画像\n{profile}\n" if profile else ""
 
+    task_block = f"\n## 任务描述\n{task}\n" if task else ""
+
     output_block = f"\n## 输出规范\n{output_spec}\n" if output_spec else ""
 
     schema_block = ""
@@ -68,6 +71,7 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
 
     return f"""{role}
 {profile_block}
+{task_block}
 ## 你的工作流
 {step_lines}
 

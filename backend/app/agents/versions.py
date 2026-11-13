@@ -24,6 +24,7 @@ FIELD_LABELS = {
     "name": "名称",
     "role": "角色定位",
     "profile": "角色画像",
+    "task": "任务描述",
     "workflow": "工作流",
     "tools": "可用工具",
     "output_format": "输出格式",
@@ -37,6 +38,7 @@ def snapshot(row: AgentConfigRow) -> dict[str, Any]:
         "name": row.name,
         "role": row.role or "",
         "profile": row.profile or "",
+        "task": row.task or "",
         "workflow": row.workflow or [],
         "tools": row.tools or [],
         "output_format": row.output_format or {"type": "text"},
@@ -134,6 +136,7 @@ def restore_version(db: Session, row: AgentConfigRow, version: AgentConfigVersio
     row.name = payload.get("name", row.name)
     row.role = payload.get("role", "")
     row.profile = payload.get("profile", "")
+    row.task = payload.get("task", "")
     row.workflow = payload.get("workflow", [])
     row.tools = payload.get("tools", [])
     row.output_format = payload.get("output_format", {"type": "text"})

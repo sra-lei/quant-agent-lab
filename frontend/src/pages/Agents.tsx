@@ -39,6 +39,7 @@ interface FormValues {
   name: string
   role: string
   profile: string
+  task: string
   workflow: Array<{ name: string; instruction: string }>
   tools: string[]
   output_format_type: OutputFormatType
@@ -86,6 +87,7 @@ export default function Agents() {
         name: values.name,
         role: values.role ?? '',
         profile: values.profile ?? '',
+        task: values.task ?? '',
         workflow: (values.workflow ?? []).map((s, i) => ({ ...s, name: stepName(i) })),
         tools: values.tools ?? [],
         output_format:
@@ -171,6 +173,7 @@ export default function Agents() {
             name: row.name,
             role: row.role,
             profile: row.profile ?? '',
+            task: row.task ?? '',
             workflow: (row.workflow ?? []).map((s, i) => ({ ...s, name: stepName(i) })),
             tools: row.tools ?? [],
             output_format_type: row.output_format?.type ?? 'text',
@@ -184,6 +187,7 @@ export default function Agents() {
             name: '',
             role: '',
             profile: '',
+            task: '',
             workflow: [{ name: stepName(0), instruction: '' }],
             tools: [],
             output_format_type: 'markdown_table',
@@ -211,13 +215,22 @@ export default function Agents() {
     {
       title: '角色定位',
       dataIndex: 'role',
+      width: 180,
       ellipsis: true,
       render: (role: string) => role || <Text type="secondary">未填写</Text>,
     },
     {
+      title: '任务描述',
+      dataIndex: 'task',
+      width: 280,
+      ellipsis: true,
+      render: (task: string) =>
+        task ? task : <Text type="secondary">未填写</Text>,
+    },
+    {
       title: '工作流',
       dataIndex: 'workflow',
-      width: 90,
+      width: 80,
       render: (w: unknown[]) => `${w?.length ?? 0} 步`,
     },
     {
@@ -299,6 +312,7 @@ export default function Agents() {
         columns={columns}
         dataSource={agents ?? []}
         pagination={false}
+        scroll={{ x: 1320 }}
       />
 
       <Drawer
@@ -443,6 +457,19 @@ export default function Agents() {
             <TextArea
               rows={7}
               placeholder={'例如：\n- 历史规律：0.9（深信历史会重演，主动对比相似日）\n- 细节洞察力：0.85（关注炸板率、封成比）\n- 风险敏感度：0.95（对核按钮、天地板极度敏感）'}
+              maxLength={4000}
+              showCount
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="task"
+            label="任务描述"
+            tooltip="这次/每天要完成什么：目标、口径、必须回答的问题。不要写排版要求——那些放输出规范"
+          >
+            <TextArea
+              rows={5}
+              placeholder={'例如：\n复盘当日情绪：统计连板梯队与封板率、计算情绪指数并与昨日对比、找出赚钱/亏钱效应所在，给出明日主线与防守锚点。'}
               maxLength={4000}
               showCount
             />

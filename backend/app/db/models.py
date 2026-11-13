@@ -125,6 +125,8 @@ class AgentConfigRow(Base):
     role: Mapped[str] = mapped_column(Text, default="")
     #: 角色画像：性格权重、信念、偏好、忌讳（从 role 里拆出来的）
     profile: Mapped[str] = mapped_column(Text, default="")
+    #: 任务描述：这次/每天要完成什么，与「输出规范」分开——一个说做什么，一个说长什么样
+    task: Mapped[str] = mapped_column(Text, default="")
     workflow: Mapped[list] = mapped_column(JSON, default=list)
     tools: Mapped[list] = mapped_column(JSON, default=list)
     output_format: Mapped[dict] = mapped_column(JSON, default=dict)
