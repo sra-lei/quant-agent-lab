@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.5",
     "httpx>=0.26",
     "apscheduler>=3.10",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]

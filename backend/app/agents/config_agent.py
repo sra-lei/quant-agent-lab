@@ -46,6 +46,19 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
         "text": "输出简洁的中文结论，要点化。",
     }.get(fmt, "输出简洁的中文结论。")
 
+    schema_block = ""
+    if fmt == "json_schema":
+        schema = (config.get("output_format") or {}).get("schema") or {}
+        schema_block = (
+            "\n## 必须遵循的 JSON Schema\n```json\n"
+            + json.dumps(schema, ensure_ascii=False, indent=2)
+            + "\n```\n"
+            "要求：\n"
+            "1. 只输出 JSON 本身，不要 Markdown 代码块标记，不要任何解释性文字\n"
+            "2. required 中列出的字段一个都不能少，名称必须完全一致（区分大小写）\n"
+            "3. 不要在顶层新增 schema 未定义的字段；需要补充说明就写进 notes 字段\n"
+        )
+
     return f"""{role}
 
 ## 你的工作流
@@ -56,7 +69,7 @@ def build_prompt(config: dict[str, Any], input_payload: dict[str, Any]) -> str:
 
 ## 输出要求
 {fmt_hint}
-
+{schema_block}
 ## 本次输入
 {json.dumps(input_payload, ensure_ascii=False, indent=2)}
 """

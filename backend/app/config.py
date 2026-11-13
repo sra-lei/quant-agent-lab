@@ -8,6 +8,20 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
+
+# 加载 backend/.env（仓库根目录的 .env 作为兜底）。
+# 没装 python-dotenv 时静默跳过：环境变量仍然可用，不阻塞启动。
+try:
+    from dotenv import load_dotenv
+
+    _here = Path(__file__).resolve()
+    for _candidate in (_here.parents[1] / ".env", _here.parents[2] / ".env"):
+        if _candidate.is_file():
+            load_dotenv(_candidate, override=False)
+            break
+except Exception:  # noqa: BLE001
+    pass
 
 
 def _env(name: str, default: str = "") -> str:

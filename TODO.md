@@ -31,3 +31,5 @@
 - [x] 提示词与配置版本历史（差异对比 + 回滚）
 - [x] 工具执行层（8 个工具 handler + function calling 循环）
 - [x] 单进程单端口部署（FastAPI 托管前端）
+- [x] 接入真实 LLM（DeepSeek deepseek-v4-flash）：多轮工具调用 + schema 校验通过
+      · 实测一次价投 Agent：3 轮、3 次工具调用、约 5.3k tokens
