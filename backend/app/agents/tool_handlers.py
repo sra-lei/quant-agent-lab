@@ -253,11 +253,55 @@ def _report_write(ctx: ToolContext, args: dict) -> dict:
     return {"saved": True, "path": str(path), "bytes": len(body)}
 
 
+def _zvt_kline(_ctx: ToolContext, args: dict[str, Any]) -> dict:
+    code = str(args.get("code") or "").strip()
+    if not code:
+        return {"error": "缺少参数 code"}
+    days = int(args.get("days") or 60)
+
+    from app.data.zvt_local import default_store
+
+    try:
+        data = default_store().kline(code, days)
+    except RuntimeError as exc:
+        return {"error": str(exc)}
+
+    # 只回尾部若干根，防止一次把 60 天全塞进上下文
+    bars = data.pop("bars", [])
+    data["bars_tail"] = bars[-12:]
+    return data
+
+
+def _zvt_limit_board(_ctx: ToolContext, args: dict[str, Any]) -> dict:
+    from app.data.zvt_local import default_store, parse_date
+
+    store = default_store()
+    try:
+        on = store.resolve_date(parse_date(args.get("date")))
+        return store.limit_board(on)
+    except RuntimeError as exc:
+        return {"error": str(exc)}
+
+
+def _zvt_breadth(_ctx: ToolContext, args: dict[str, Any]) -> dict:
+    from app.data.zvt_local import default_store, parse_date
+
+    store = default_store()
+    try:
+        on = store.resolve_date(parse_date(args.get("date")))
+        return store.breadth(on)
+    except RuntimeError as exc:
+        return {"error": str(exc)}
+
+
 HANDLERS = {
     "market.quotes": _market_quotes,
     "market.fundamentals": _market_fundamentals,
     "market.announcements": _market_announcements,
     "market.breadth": _market_breadth,
+    "zvt.kline": _zvt_kline,
+    "zvt.limit_board": _zvt_limit_board,
+    "zvt.breadth": _zvt_breadth,
     "calc.indicators": _calc_indicators,
     "calc.score": _calc_score,
     "llm.complete": _llm_complete,

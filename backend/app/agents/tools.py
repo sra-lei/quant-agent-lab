@@ -81,6 +81,44 @@ CATALOG: dict[str, ToolSpec] = {
             },
         },
     ),
+    "zvt.kline": ToolSpec(
+        key="zvt.kline",
+        label="本地日线+缠论",
+        description="从本地 zvt 全市场库取个股日线（后复权），附带缠论方向/笔/中枢状态",
+        params=["code", "days"],
+        args_schema={
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "股票代码，如 600519"},
+                "days": {"type": "integer", "description": "回看的交易日数量", "default": 60},
+            },
+            "required": ["code"],
+        },
+    ),
+    "zvt.limit_board": ToolSpec(
+        key="zvt.limit_board",
+        label="涨停梯队（本地库）",
+        description="全市场涨停股清单与连板梯队、炸板数、封板成功率、面王、涨跌家数",
+        params=["date"],
+        args_schema={
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "交易日 YYYY-MM-DD，缺省为库内最新交易日"},
+            },
+        },
+    ),
+    "zvt.breadth": ToolSpec(
+        key="zvt.breadth",
+        label="市场宽度（本地库）",
+        description="涨跌家数、涨跌停数、中位涨幅、成交额、封板成功率",
+        params=["date"],
+        args_schema={
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "交易日 YYYY-MM-DD，缺省为库内最新交易日"},
+            },
+        },
+    ),
     "calc.indicators": ToolSpec(
         key="calc.indicators",
         label="技术指标",
