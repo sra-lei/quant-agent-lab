@@ -58,12 +58,13 @@ class TaskPlan(BaseModel):
 # ---------------------------------------------------------------------------
 class Bar(BaseModel):
     date: date
-    open: float
-    high: float
-    low: float
     close: float
-    volume: float
-    amount: float
+    #: 部分数据源（如问小达）只提供收盘价与成交量，其余字段留空不臆造
+    open: float | None = None
+    high: float | None = None
+    low: float | None = None
+    volume: float | None = None
+    amount: float | None = None
 
 
 class Fundamental(BaseModel):
@@ -83,11 +84,12 @@ class Announcement(BaseModel):
 
 
 class MarketBreadth(BaseModel):
-    advancers: int = 0
-    decliners: int = 0
-    limit_up: int = 0
-    limit_down: int = 0
-    turnover_rate: float = 0.0
+    #: 数据源可能只提供部分字段；None 表示"没拿到"，不是 0
+    advancers: int | None = None
+    decliners: int | None = None
+    limit_up: int | None = None
+    limit_down: int | None = None
+    turnover_rate: float | None = None
 
 
 class Quality(BaseModel):

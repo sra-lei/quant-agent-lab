@@ -33,11 +33,19 @@ class MomentumAnalystAgent(BaseAgent):
         max_conviction = float(payload.get("max_conviction", 0.9))
         warnings: list[str] = []
 
-        # 全市场情绪温度：涨跌家数与涨停数
+        # 全市场情绪温度：涨跌家数与涨停数（数据源可能只给其中一部分）
         b = snapshot.breadth
-        total = max(b.advancers + b.decliners, 1)
-        heat = b.advancers / total
-        if b.limit_up >= 60:
+        heat: float | None = None
+        if b.advancers is not None and b.decliners is not None:
+            total = max(b.advancers + b.decliners, 1)
+            heat = b.advancers / total
+        else:
+            warnings.append("数据源未提供涨跌家数，市场温度维度未计分")
+
+        if b.limit_up is None:
+            mood, mood_adj = "未知", 0.0
+            warnings.append("数据源未提供涨停家数，情绪修正未生效")
+        elif b.limit_up >= 60:
             mood, mood_adj = "偏热", 0.05
         elif b.limit_up >= 25:
             mood, mood_adj = "中性偏暖", 0.0
@@ -52,23 +60,32 @@ class MomentumAnalystAgent(BaseAgent):
         for code in snapshot.universe:
             bars = snapshot.bars.get(code) or []
             closes = [x.close for x in bars]
-            volumes = [x.volume for x in bars]
-            if len(closes) < 21:
+            raw_volumes = [x.volume for x in bars]
+            volumes = [v for v in raw_volumes if v is not None]
+            if len(closes) < 6:
                 continue
 
             ret5 = _pct(closes, 5)
-            ret20 = _pct(closes, 20)
-            avg_vol = mean(volumes[-6:-1]) if len(volumes) >= 6 else 0
+            # 部分数据源（问小达）单次最多给 20 个交易日，不足以算 20 日动量
+            ret20 = _pct(closes, 20) if len(closes) >= 21 else None
+            # 数据源可能不提供成交量（如问小达部分查询），此时不做量能加分，并标注
+            has_volume = len(raw_volumes) >= 6 and all(v is not None for v in raw_volumes[-6:])
+            avg_vol = mean(volumes[-6:-1]) if has_volume else 0
             vol_ratio = (volumes[-1] / avg_vol) if avg_vol else 0.0
+            if not has_volume:
+                warnings.append(f"{code} 缺少成交量数据，量能维度记为 0")
 
-            if ret5 is None or ret20 is None:
+            if ret5 is None:
                 continue
 
             score = 0.0
             score += 0.4 * _clip((ret5 + 0.05) / 0.10)      # 5 日动量
             score += 0.3 * _clip((vol_ratio - 0.8) / 1.2)   # 量能放大
-            score += 0.2 * _clip((ret20 + 0.10) / 0.20)     # 中期趋势
-            score += 0.1 * _clip(heat)                       # 市场温度
+            if ret20 is not None:
+                score += 0.2 * _clip((ret20 + 0.10) / 0.20)  # 中期趋势
+            else:
+                warnings.append(f"{code} 历史不足 21 根，20 日趋势维度未计分")
+            score += 0.1 * _clip(heat) if heat is not None else 0.0   # 市场温度
             score = _clip(score + mood_adj)
 
             conviction = round(min(score, max_conviction), 3)
@@ -92,8 +109,8 @@ class MomentumAnalystAgent(BaseAgent):
                     conviction=conviction,
                     horizon_days=5,
                     rationale=(
-                        f"5 日 {ret5:+.1%}、20 日 {ret20:+.1%}、量比 {vol_ratio:.2f}；"
-                        f"情绪阶段：{stage}（全市场 {mood}，涨停 {b.limit_up} 家）"
+                        f"5 日 {ret5:+.1%}、20 日 {f'{ret20:+.1%}' if ret20 is not None else '—'}、量比 {vol_ratio:.2f}；"
+                        f"情绪阶段：{stage}（全市场 {mood}，涨停 {b.limit_up if b.limit_up is not None else '—'} 家）"
                     ),
                     entry_zone=[round(close * 0.98, 2), round(close * 1.02, 2)],
                     invalidation="量能萎缩至 5 日均量 80% 以下，或跌破 5 日均线",
@@ -108,7 +125,7 @@ class MomentumAnalystAgent(BaseAgent):
             snapshot_id=snapshot.snapshot_id,
             as_of=snapshot.as_of,
             candidates=candidates[:10],
-            notes=f"全市场情绪：{mood}（上涨 {b.advancers} / 下跌 {b.decliners}，涨停 {b.limit_up}）",
+            notes=f"全市场情绪：{mood}（上涨 {b.advancers if b.advancers is not None else '—'} / 下跌 {b.decliners if b.decliners is not None else '—'}，涨停 {b.limit_up if b.limit_up is not None else '—'}）",
             warnings=warnings,
         )
 
