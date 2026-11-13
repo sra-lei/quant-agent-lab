@@ -89,6 +89,57 @@ export interface RunResult {
   traces: Array<{ agent: string; status: string; duration_ms: number }>
 }
 
+// ---------------------------------------------------------------- agents
+export type OutputFormatType = 'json_schema' | 'markdown_table' | 'text'
+
+export interface AgentTool {
+  key: string
+  label: string
+  description: string
+  params: string[]
+}
+
+export interface WorkflowStep {
+  name: string
+  instruction: string
+}
+
+export interface AgentOutputFormat {
+  type: OutputFormatType
+  schema?: Record<string, unknown>
+}
+
+export interface AgentConfig {
+  agent_id: string
+  name: string
+  role: string
+  workflow: WorkflowStep[]
+  tools: string[]
+  output_format: AgentOutputFormat
+  enabled: boolean
+  builtin: boolean
+  updated_at: string | null
+}
+
+export interface AgentMeta {
+  tools: AgentTool[]
+  output_formats: Array<{ type: OutputFormatType; label: string; description: string }>
+  default_schema: Record<string, unknown>
+}
+
+export interface AgentRunResult {
+  agent_id: string
+  output: unknown
+  raw: string
+  format_ok: boolean
+  error: string | null
+  tokens: number
+  mock: boolean
+  prompt_preview: string
+}
+
+export type AgentConfigPayload = Omit<AgentConfig, 'agent_id' | 'builtin' | 'updated_at'>
+
 export const api = {
   health: () => get<Health>('/health'),
   signals: () => get<Signal[]>('/signals'),
@@ -99,4 +150,12 @@ export const api = {
   deleteStrategy: (id: number) => del<{ deleted: number }>(`/strategies/${id}`),
   createRun: (body: { goal: string; universe: string[]; capital: number; risk: string }) =>
     post<RunResult>('/runs', body),
+
+  agentMeta: () => get<AgentMeta>('/agents/meta'),
+  agents: () => get<AgentConfig[]>('/agents'),
+  createAgent: (body: AgentConfigPayload) => post<AgentConfig>('/agents', body),
+  updateAgent: (id: string, body: AgentConfigPayload) => put<AgentConfig>(`/agents/${id}`, body),
+  deleteAgent: (id: string) => del<{ deleted: string }>(`/agents/${id}`),
+  runAgent: (id: string, input: Record<string, unknown>) =>
+    post<AgentRunResult>(`/agents/${id}/run`, { input }),
 }

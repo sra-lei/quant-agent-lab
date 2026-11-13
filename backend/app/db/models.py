@@ -99,3 +99,23 @@ class AgentTrace(Base):
     duration_ms: Mapped[float] = mapped_column(Float, default=0.0)
     tokens: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AgentConfigRow(Base):
+    """前端「智能体编辑器」持久化的配置。
+
+    builtin=True 的条目由系统预置，可编辑但不可删除，agent_id 也不允许改。
+    """
+
+    __tablename__ = "agent_configs"
+
+    agent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    role: Mapped[str] = mapped_column(Text, default="")
+    workflow: Mapped[list] = mapped_column(JSON, default=list)
+    tools: Mapped[list] = mapped_column(JSON, default=list)
+    output_format: Mapped[dict] = mapped_column(JSON, default=dict)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

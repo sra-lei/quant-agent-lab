@@ -7,10 +7,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.agent_configs import router as agent_configs_router
 from app.api.routes import router
 from app.config import settings
 from app.core.logging import get_logger
-from app.db.session import init_db
+from app.db.seed import seed_builtin_agents
+from app.db.session import init_db, session_scope
 
 log = get_logger(__name__)
 
@@ -18,6 +20,8 @@ log = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    with session_scope() as db:
+        seed_builtin_agents(db)
     log.info(
         "quant-agent-lab started orchestrator=%s provider=%s",
         settings.orchestrator,
@@ -42,6 +46,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(agent_configs_router)
 
 
 @app.get("/")

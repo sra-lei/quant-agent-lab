@@ -11,6 +11,7 @@ import Signals from './pages/Signals'
 import Strategies from './pages/Strategies'
 import Runs from './pages/Runs'
 import Reviews from './pages/Reviews'
+import Agents from './pages/Agents'
 import './styles.css'
 
 const queryClient = new QueryClient({
@@ -27,6 +28,7 @@ createRoot(document.getElementById('root')!).render(
               <Route index element={<Dashboard />} />
               <Route path="signals" element={<Signals />} />
               <Route path="strategies" element={<Strategies />} />
+              <Route path="agents" element={<Agents />} />
               <Route path="runs" element={<Runs />} />
               <Route path="reviews" element={<Reviews />} />
             </Route>

@@ -5,6 +5,7 @@ import {
   FileSearchOutlined,
   FundOutlined,
   ProfileOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 
@@ -14,6 +15,7 @@ const items = [
   { key: '/', icon: <DashboardOutlined />, label: <Link to="/">总览</Link> },
   { key: '/signals', icon: <FundOutlined />, label: <Link to="/signals">信号</Link> },
   { key: '/strategies', icon: <ExperimentOutlined />, label: <Link to="/strategies">策略</Link> },
+  { key: '/agents', icon: <RobotOutlined />, label: <Link to="/agents">智能体</Link> },
   { key: '/runs', icon: <ProfileOutlined />, label: <Link to="/runs">运行记录</Link> },
   { key: '/reviews', icon: <FileSearchOutlined />, label: <Link to="/reviews">复盘</Link> },
 ]
