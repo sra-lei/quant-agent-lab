@@ -170,6 +170,106 @@ export interface AgentReport extends AgentReportSummary {
   content: string
 }
 
+// ---------------------------------------------------------------- dashboard
+export type ModuleStatus = 'ok' | 'degraded' | 'missing'
+
+export interface DashboardModule<T> {
+  status: ModuleStatus
+  source: string
+  as_of?: string
+  note?: string
+  data: T
+}
+
+export interface PanoramaData {
+  brief: string
+  phase: { key: string; label: string; since: string; days: number }
+  sentiment_index: { today: number; yesterday: number; delta: number; trend_5d: string }
+  core_conflict: {
+    text: string
+    evidences: Array<{ label: string; value: string; change: string }>
+  }
+}
+
+export interface FlowItem {
+  board: string
+  net_inflow_yi?: number
+  net_outflow_yi?: number
+  change_pct: number
+  leader: string
+}
+
+export interface CapitalFlowData {
+  net_inflow_top: FlowItem[]
+  net_outflow_top: FlowItem[]
+  note?: string
+}
+
+export interface SentimentPoint {
+  date: string
+  value: number
+}
+
+export interface ExtremeItem {
+  type: 'stock' | 'board'
+  code: string
+  name: string
+  reason: string
+  side: 'hot' | 'cold'
+}
+
+export interface SentimentData {
+  series: SentimentPoint[]
+  ma20: number
+  extremes: ExtremeItem[]
+}
+
+export interface OpportunityData {
+  axes: string[]
+  today: number[]
+  ma5: number[]
+  picks: Array<{ direction: string; conviction: number; reason: string }>
+}
+
+export interface RiskItem {
+  level: 'high' | 'medium' | 'low'
+  title: string
+  evidence: string
+  source: string
+  time: string
+}
+
+export interface Position {
+  code: string
+  name: string
+  cost: number
+  price: number
+  pnl_pct: number
+  weight: number
+  hot_board: string
+}
+
+export interface PortfolioData {
+  summary: { total_pnl: number; total_pnl_pct: number; today_pnl: number; match_score: number }
+  positions: Position[]
+  advices: Array<{ code: string; action: string; reason: string; trigger: string }>
+}
+
+export interface DashboardPayload {
+  as_of: string
+  generated_at: string
+  mock: boolean
+  degraded_modules: string[]
+  modules: {
+    panorama: DashboardModule<PanoramaData>
+    capital_flow: DashboardModule<CapitalFlowData>
+    sentiment: DashboardModule<SentimentData>
+    opportunity: DashboardModule<OpportunityData>
+    risks: DashboardModule<{ items: RiskItem[] }>
+    portfolio: DashboardModule<PortfolioData>
+  }
+}
+
 export type AgentConfigPayload = Omit<AgentConfig, 'agent_id' | 'builtin' | 'updated_at'>
 
 export interface AgentVersion {
@@ -229,4 +329,6 @@ export const api = {
     get<AgentReportSummary[]>(`/reports${agentId ? `?agent_id=${agentId}` : ''}`),
   report: (id: string) => get<AgentReport>(`/reports/${id}`),
   deleteReport: (id: string) => del<{ deleted: string }>(`/reports/${id}`),
+
+  dashboard: () => get<DashboardPayload>('/dashboard'),
 }
