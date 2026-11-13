@@ -63,6 +63,13 @@ app.include_router(agent_configs_router)
 _dist = Path(FRONTEND_DIST).expanduser() if FRONTEND_DIST else None
 _has_frontend = bool(_dist and _dist.is_dir() and (_dist / "index.html").is_file())
 
+#: index.html 不能缓存：它引用带 hash 的 bundle，缓存住就永远拿不到新前端
+_NO_CACHE = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
 if _has_frontend and (_dist / "assets").is_dir():  # type: ignore[operator]
     app.mount("/assets", StaticFiles(directory=str(_dist / "assets")), name="assets")
 
@@ -70,7 +77,7 @@ if _has_frontend and (_dist / "assets").is_dir():  # type: ignore[operator]
 @app.get("/", include_in_schema=not _has_frontend)
 def root():
     if _has_frontend:
-        return FileResponse(_dist / "index.html")  # type: ignore[operator]
+        return FileResponse(_dist / "index.html", headers=_NO_CACHE)  # type: ignore[operator]
     return {
         "name": "quant-agent-lab",
         "version": "0.1.0",
@@ -87,4 +94,4 @@ if _has_frontend:
         candidate = _dist / full_path  # type: ignore[operator]
         if full_path and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(_dist / "index.html")  # type: ignore[operator]
+        return FileResponse(_dist / "index.html", headers=_NO_CACHE)  # type: ignore[operator]

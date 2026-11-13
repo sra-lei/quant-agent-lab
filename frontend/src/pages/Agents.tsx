@@ -57,6 +57,20 @@ export default function Agents() {
   const [form] = Form.useForm<FormValues>()
   const formatType = Form.useWatch('output_format_type', form)
 
+  const stepName = (index: number) => `第 ${index + 1} 步`
+
+  // 只有「占位式」步骤名才重排；内置 Agent 自己起的名字（如「取标的池」）保留
+  const isGenericStepName = (name?: string) =>
+    !name || /^第\s*\d+\s*步$/.test(name) || /^第[一二三四五六七八九十]+步$/.test(name)
+
+  const renumberSteps = () => {
+    const list = (form.getFieldValue('workflow') as Array<{ name: string; instruction: string }> | undefined) ?? []
+    form.setFieldValue(
+      'workflow',
+      list.map((s, i) => ({ ...s, name: isGenericStepName(s.name) ? stepName(i) : s.name })),
+    )
+  }
+
   const save = useMutation({
     mutationFn: async (values: FormValues) => {
       let schema: Record<string, unknown> | undefined
@@ -71,7 +85,7 @@ export default function Agents() {
         name: values.name,
         role: values.role ?? '',
         profile: values.profile ?? '',
-        workflow: values.workflow ?? [],
+        workflow: (values.workflow ?? []).map((s, i) => ({ ...s, name: stepName(i) })),
         tools: values.tools ?? [],
         output_format:
           values.output_format_type === 'json_schema'
@@ -156,7 +170,7 @@ export default function Agents() {
             name: row.name,
             role: row.role,
             profile: row.profile ?? '',
-            workflow: row.workflow ?? [],
+            workflow: (row.workflow ?? []).map((s, i) => ({ ...s, name: stepName(i) })),
             tools: row.tools ?? [],
             output_format_type: row.output_format?.type ?? 'text',
             output_spec: row.output_spec ?? '',
@@ -169,7 +183,7 @@ export default function Agents() {
             name: '',
             role: '',
             profile: '',
-            workflow: [{ name: '第一步', instruction: '' }],
+            workflow: [{ name: stepName(0), instruction: '' }],
             tools: [],
             output_format_type: 'markdown_table',
             output_spec: '',
@@ -441,22 +455,36 @@ export default function Agents() {
               <>
                 {fields.map((field, index) => (
                   <Space key={field.key} align="start" style={{ display: 'flex', marginBottom: 8 }}>
-                    <Form.Item
-                      name={[field.name, 'name']}
-                      rules={[{ required: true, message: '步骤名必填' }]}
-                      style={{ marginBottom: 0, width: 160 }}
+                    <div style={{ width: 72, lineHeight: '32px', color: 'rgba(0,0,0,0.45)' }}>
+                      第 {index + 1} 步
+                    </div>
+                    <Form.Item name={[field.name, 'name']} hidden>
+                      <Input />
+                    </Form.Item>
+                    <Form.Item name={[field.name, 'instruction']} style={{ marginBottom: 0, width: 500 }}>
+                      <TextArea rows={1} placeholder="这一步具体做什么" autoSize={{ minRows: 1, maxRows: 4 }} />
+                    </Form.Item>
+                    <Button
+                      type="text"
+                      danger
+                      onClick={() => {
+                        removeStep(field.name)
+                        window.setTimeout(renumberSteps, 0)
+                      }}
                     >
-                      <Input placeholder={`第 ${index + 1} 步`} />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'instruction']} style={{ marginBottom: 0, width: 420 }}>
-                      <TextArea rows={1} placeholder="这一步具体做什么" autoSize={{ minRows: 1, maxRows: 3 }} />
-                    </Form.Item>
-                    <Button type="text" danger onClick={() => removeStep(field.name)}>
                       删除
                     </Button>
                   </Space>
                 ))}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({ name: '', instruction: '' })}>
+                <Button
+                  type="dashed"
+                  block
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    add({ name: stepName(fields.length), instruction: '' })
+                    window.setTimeout(renumberSteps, 0)
+                  }}
+                >
                   添加步骤
                 </Button>
               </>

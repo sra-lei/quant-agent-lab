@@ -23,7 +23,8 @@ _FORMAT_TYPES = {"json_schema", "markdown_table", "text"}
 
 # --------------------------------------------------------------------- schemas
 class WorkflowStep(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
+    #: 步骤序号由系统维护（新增/删除后自动重排），这里只是兼容旧数据与内置 Agent 的语义化命名
+    name: str = Field(default="", max_length=80)
     instruction: str = ""
 
 
@@ -37,11 +38,12 @@ class OutputFormat(BaseModel):
 class AgentConfigIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     role: str = Field(default="", max_length=2000)
-    profile: str = Field(default="", max_length=4000)
+    #: None = 客户端没传这个字段（老版本前端），此时保留库里原值，不能被默认空串覆盖
+    profile: str | None = Field(default=None, max_length=4000)
     workflow: list[WorkflowStep] = Field(default_factory=list)
     tools: list[str] = Field(default_factory=list)
     output_format: OutputFormat = Field(default_factory=OutputFormat)
-    output_spec: str = Field(default="", max_length=8000)
+    output_spec: str | None = Field(default=None, max_length=8000)
     enabled: bool = True
 
     @field_validator("tools")
@@ -79,6 +81,14 @@ def _row_to_dict(row: AgentConfigRow) -> dict[str, Any]:
         "builtin": row.builtin,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }
+
+
+def _steps(items: list[WorkflowStep]) -> list[dict[str, Any]]:
+    """步骤名留空时由后端补序号，保证排序永远从 1 开始且不重名。"""
+    return [
+        {"name": s.name.strip() or f"第 {i + 1} 步", "instruction": s.instruction}
+        for i, s in enumerate(items)
+    ]
 
 
 def _new_agent_id(name: str) -> str:
@@ -122,11 +132,11 @@ def create_agent(body: AgentConfigIn) -> dict[str, Any]:
             agent_id=_new_agent_id(body.name),
             name=body.name,
             role=body.role,
-            profile=body.profile,
-            workflow=[s.model_dump() for s in body.workflow],
+            profile=body.profile or "",
+            workflow=_steps(body.workflow),
             tools=body.tools,
             output_format=body.output_format.model_dump(by_alias=True),
-            output_spec=body.output_spec,
+            output_spec=body.output_spec or "",
             enabled=body.enabled,
             builtin=False,
         )
@@ -145,11 +155,14 @@ def update_agent(agent_id: str, body: AgentConfigIn) -> dict[str, Any]:
 
         row.name = body.name
         row.role = body.role
-        row.profile = body.profile
-        row.workflow = [s.model_dump() for s in body.workflow]
+        # 未传就沿用旧值：老客户端/局部更新不该把画像和输出规范清空
+        if body.profile is not None:
+            row.profile = body.profile
+        row.workflow = _steps(body.workflow)
         row.tools = body.tools
         row.output_format = body.output_format.model_dump(by_alias=True)
-        row.output_spec = body.output_spec
+        if body.output_spec is not None:
+            row.output_spec = body.output_spec
         row.enabled = body.enabled
         row.updated_at = datetime.now()
         db.flush()
